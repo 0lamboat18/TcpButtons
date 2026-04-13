@@ -51,7 +51,7 @@
 		8B0003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				BUNDLE_IDENTIFIER = com.tcpbuttons.app;
 				CODE_SIGN_STYLE = Automatic;
@@ -68,7 +68,7 @@
 		8B0004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				BUNDLE_IDENTIFIER = com.tcpbuttons.app;
 				CODE_SIGN_STYLE = Automatic;
