@@ -1,0 +1,27 @@
+workflows:
+  ios-development:
+    name: iOS Development Build
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Set bundle ID
+        script: |
+          cd $CM_BUILD_DIR
+          xcrun agvtool new-version -all 1
+      - name: Build unsigned IPA
+        script: |
+          xcodebuild \
+            -project TcpButtons.xcodeproj \
+            -scheme TcpButtons \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS=arm64
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/TcpButtons.app Payload/
+          zip -r TcpButtons.ipa Payload
+    artifacts:
+      - TcpButtons.ipa
