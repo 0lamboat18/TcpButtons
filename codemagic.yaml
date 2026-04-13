@@ -5,6 +5,10 @@ workflows:
     environment:
       xcode: latest
     scripts:
+      - name: Fix signing settings
+        script: |
+          cd $CM_BUILD_DIR
+          /usr/libexec/PlistBuddy -c "Set :objects:$(xcrun xcodebuild -project TcpButtons.xcodeproj -list 2>/dev/null)" TcpButtons.xcodeproj/project.pbxproj 2>/dev/null || true
       - name: Build app
         script: |
           xcodebuild \
@@ -13,20 +17,23 @@ workflows:
             -configuration Debug \
             -sdk iphoneos \
             -derivedDataPath $CM_BUILD_DIR/build \
+            DEVELOPMENT_TEAM="" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             ARCHS=arm64 \
-            build
+            build 2>&1 | tail -50
       - name: Package IPA
         script: |
           APP_PATH=$(find $CM_BUILD_DIR/build -name "*.app" | head -1)
-          echo "Found app at: $APP_PATH"
+          echo "App path: $APP_PATH"
           ls -la "$APP_PATH"
           mkdir -p $CM_BUILD_DIR/Payload
           cp -r "$APP_PATH" $CM_BUILD_DIR/Payload/
           cd $CM_BUILD_DIR
           zip -r TcpButtons.ipa Payload/
-          ls -lh TcpButtons.ipa
     artifacts:
       - $CM_BUILD_DIR/TcpButtons.ipa
