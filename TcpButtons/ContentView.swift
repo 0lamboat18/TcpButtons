@@ -6,8 +6,7 @@ class TCPManager: ObservableObject {
     private let queue = DispatchQueue(label: "tcp", qos: .userInteractive)
     @Published var status: String = "Connexion..."
     @Published var connected: Bool = false
-
-    let host: String
+    var host: String
     let port: UInt16 = 9000
 
     init(host: String) {
@@ -42,6 +41,12 @@ class TCPManager: ObservableObject {
         connection?.start(queue: queue)
     }
 
+    func updateHost(_ newHost: String) {
+        connection?.cancel()
+        host = newHost
+        connect()
+    }
+
     func send(_ message: String) {
         guard connected, let data = (message + "\n").data(using: .utf8) else { return }
         connection?.send(content: data, completion: .contentProcessed { [weak self] error in
@@ -57,45 +62,99 @@ class TCPManager: ObservableObject {
     }
 }
 
+struct TCPButton: View {
+    let label: String
+    let color: Color
+    let action: () -> Void
+    let disabled: Bool
+
+    @State private var pressed = false
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            Text(label)
+                .font(.system(size: 32, weight: .semibold))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(disabled ? Color.gray : (pressed ? color.opacity(0.6) : color))
+                .foregroundColor(.white)
+                .cornerRadius(20)
+                .scaleEffect(pressed ? 0.96 : 1.0)
+                .animation(.easeInOut(duration: 0.1), value: pressed)
+        }
+        .disabled(disabled)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in pressed = true }
+                .onEnded { _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        pressed = false
+                    }
+                }
+        )
+    }
+}
+
 struct ContentView: View {
-    @StateObject private var tcp = TCPManager(host: "192.168.1.100")
+    @StateObject private var tcp = TCPManager(host: UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100")
+    @State private var ipInput: String = UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100"
+    @State private var showIPField: Bool = false
 
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(tcp.connected ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(tcp.status)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+
+                // Status + bouton réglages
+                HStack {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(tcp.connected ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                        Text(tcp.status)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        withAnimation { showIPField.toggle() }
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .padding(.bottom, 48)
+                .padding(.bottom, 12)
 
+                // Champ IP
+                if showIPField {
+                    HStack(spacing: 8) {
+                        TextField("Adresse IP", text: $ipInput)
+                            .keyboardType(.numbersAndPunctuation)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+
+                        Button("OK") {
+                            let trimmed = ipInput.trimmingCharacters(in: .whitespaces)
+                            guard !trimmed.isEmpty else { return }
+                            UserDefaults.standard.set(trimmed, forKey: "savedHost")
+                            tcp.updateHost(trimmed)
+                            withAnimation { showIPField = false }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
+                // Boutons
                 VStack(spacing: 20) {
-                    Button { tcp.send("dom") } label: {
-                        Text("DOM")
-                            .font(.system(size: 32, weight: .semibold))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(tcp.connected ? Color.blue : Color.gray)
-                            .foregroundColor(.white)
-                            .cornerRadius(20)
-                    }
-                    .disabled(!tcp.connected)
-
-                    Button { tcp.send("ext") } label: {
-                        Text("EXT")
-                            .font(.system(size: 32, weight: .semibold))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(tcp.connected ? Color.green : Color.gray)
-                            .foregroundColor(.white)
-                            .cornerRadius(20)
-                    }
-                    .disabled(!tcp.connected)
+                    TCPButton(label: "DOM", color: .blue, action: { tcp.send("dom") }, disabled: !tcp.connected)
+                    TCPButton(label: "EXT", color: .green, action: { tcp.send("ext") }, disabled: !tcp.connected)
                 }
                 .frame(maxHeight: 400)
+                .padding(.top, 24)
             }
             .padding(24)
         }
