@@ -1,110 +1,75 @@
 import SwiftUI
 import Network
 
-class TCPManager: ObservableObject {
-    private var connection: NWConnection?
-    private let queue = DispatchQueue(label: "tcp", qos: .userInteractive)
-    @Published var status: String = "Démarrage..."
-    @Published var connected: Bool = false
-    @Published var logs: [String] = []
-    var host: String
-    let port: UInt16 = 9000
+func sendTCP(message: String, host: String, port: UInt16 = 9000, completion: @escaping (String) -> Void) {
+    let queue = DispatchQueue(label: "tcp.send", qos: .userInteractive)
+    let connection = NWConnection(
+        host: NWEndpoint.Host(host),
+        port: NWEndpoint.Port(rawValue: port)!,
+        using: .tcp
+    )
 
-    init(host: String) {
-        self.host = host
-        addLog("Init avec host: \(host)")
-        connect()
-    }
-
-    func addLog(_ msg: String) {
-        DispatchQueue.main.async {
-            let time = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-            self.logs.insert("[\(time)] \(msg)", at: 0)
-            if self.logs.count > 20 { self.logs.removeLast() }
-        }
-    }
-
-    func connect() {
-        addLog("Tentative connexion → \(host):\(port)")
-        connected = false
-        status = "Connexion à \(host)..."
-
-        let endpoint = NWEndpoint.Host(host)
-        guard let portEndpoint = NWEndpoint.Port(rawValue: port) else {
-            addLog("❌ Port invalide")
-            return
-        }
-
-        connection = NWConnection(host: endpoint, port: portEndpoint, using: .tcp)
-
-        connection?.stateUpdateHandler = { [weak self] state in
-            guard let self = self else { return }
-            switch state {
-            case .setup:
-                self.addLog("State: setup")
-            case .preparing:
-                self.addLog("State: préparation...")
-            case .ready:
-                self.addLog("✅ Connecté !")
-                DispatchQueue.main.async {
-                    self.connected = true
-                    self.status = "Connecté à \(self.host)"
-                }
-            case .failed(let error):
-                self.addLog("❌ Échec: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.connected = false
-                    self.status = "Erreur: \(error.localizedDescription)"
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    self.connect()
-                }
-            case .waiting(let reason):
-                self.addLog("⏳ En attente: \(reason)")
-                DispatchQueue.main.async {
-                    self.connected = false
-                    self.status = "En attente: \(reason)"
-                }
-            case .cancelled:
-                self.addLog("🚫 Annulé")
-            @unknown default:
-                self.addLog("State inconnu")
+    connection.stateUpdateHandler = { state in
+        switch state {
+        case .ready:
+            guard let data = (message + "\n").data(using: .utf8) else {
+                completion("❌ Encodage message impossible")
+                connection.cancel()
+                return
             }
+            connection.send(content: data, completion: .contentProcessed { error in
+                if let error = error {
+                    completion("❌ Erreur envoi: \(error.localizedDescription)")
+                } else {
+                    completion("✅ \"\(message)\" envoyé à \(host):\(port)")
+                }
+                connection.cancel()
+            })
+        case .failed(let error):
+            completion("❌ Connexion impossible: \(error.localizedDescription)")
+            connection.cancel()
+        case .waiting(let reason):
+            completion("⏳ En attente: \(reason)")
+            connection.cancel()
+        default:
+            break
         }
-
-        connection?.start(queue: queue)
     }
+    connection.start(queue: queue)
+}
 
-    func updateHost(_ newHost: String) {
-        addLog("Changement IP → \(newHost)")
-        connection?.cancel()
-        host = newHost
-        connect()
-    }
+func pingTCP(host: String, port: UInt16 = 9000, completion: @escaping (String) -> Void) {
+    let queue = DispatchQueue(label: "tcp.ping", qos: .userInteractive)
+    let connection = NWConnection(
+        host: NWEndpoint.Host(host),
+        port: NWEndpoint.Port(rawValue: port)!,
+        using: .tcp
+    )
+    let start = Date()
 
-    func send(_ message: String) {
-        guard connected, let data = (message + "\n").data(using: .utf8) else {
-            addLog("⚠️ Envoi impossible (non connecté)")
-            return
+    connection.stateUpdateHandler = { state in
+        switch state {
+        case .ready:
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            completion("🟢 Connecté en \(ms)ms")
+            connection.cancel()
+        case .failed(let error):
+            completion("🔴 Échec: \(error.localizedDescription)")
+            connection.cancel()
+        case .waiting(let reason):
+            completion("🔴 Injoignable: \(reason)")
+            connection.cancel()
+        default:
+            break
         }
-        addLog("📤 Envoi: \(message)")
-        connection?.send(content: data, completion: .contentProcessed { [weak self] error in
-            if let error = error {
-                self?.addLog("❌ Erreur envoi: \(error.localizedDescription)")
-                self?.connect()
-            } else {
-                self?.addLog("✅ Envoyé: \(message)")
-                DispatchQueue.main.async { self?.status = "\"\(message)\" envoyé" }
-            }
-        })
     }
+    connection.start(queue: queue)
 }
 
 struct TCPButton: View {
     let label: String
     let color: Color
     let action: () -> Void
-    let disabled: Bool
     @State private var pressed = false
 
     var body: some View {
@@ -113,13 +78,12 @@ struct TCPButton: View {
                 .font(.system(size: 32, weight: .semibold))
                 .frame(maxWidth: .infinity)
                 .frame(height: 80)
-                .background(disabled ? Color.gray : (pressed ? color.opacity(0.6) : color))
+                .background(pressed ? color.opacity(0.6) : color)
                 .foregroundColor(.white)
                 .cornerRadius(20)
                 .scaleEffect(pressed ? 0.96 : 1.0)
-                .animation(.easeInOut(duration: 0.05), value: pressed)
+                .animation(.easeInOut(duration: 0.1), value: pressed)
         }
-        .disabled(disabled)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in pressed = true }
@@ -131,56 +95,111 @@ struct TCPButton: View {
 }
 
 struct ContentView: View {
-    @StateObject private var tcp = TCPManager(host: UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100")
+    @State private var host: String = UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100"
+    @State private var port: String = UserDefaults.standard.string(forKey: "savedPort") ?? "9000"
     @State private var ipInput: String = UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100"
-    @State private var showIPField: Bool = false
+    @State private var portInput: String = UserDefaults.standard.string(forKey: "savedPort") ?? "9000"
+    @State private var showSettings: Bool = false
+    @State private var lastStatus: String = "Prêt"
+    @State private var logs: [String] = []
+    @State private var isTesting: Bool = false
+
+    func send(_ message: String) {
+        let p = UInt16(port) ?? 9000
+        addLog("📤 Envoi '\(message)' → \(host):\(p)")
+        sendTCP(message: message, host: host, port: p) { result in
+            DispatchQueue.main.async {
+                lastStatus = result
+                addLog(result)
+            }
+        }
+    }
+
+    func addLog(_ msg: String) {
+        let time = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        logs.insert("[\(time)] \(msg)", at: 0)
+        if logs.count > 20 { logs.removeLast() }
+    }
 
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 12) {
 
-                // Status
+                // Status + réglages
                 HStack {
-                    Circle()
-                        .fill(tcp.connected ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(tcp.status)
+                    Text(lastStatus)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                     Spacer()
                     Button {
-                        withAnimation { showIPField.toggle() }
+                        withAnimation { showSettings.toggle() }
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .foregroundColor(.secondary)
                     }
                 }
 
-                // Champ IP
-                if showIPField {
+                // Champs IP + Port
+                if showSettings {
                     HStack(spacing: 8) {
-                        TextField("Adresse IP", text: $ipInput)
+                        TextField("Adresse IP / host", text: $ipInput)
                             .keyboardType(.numbersAndPunctuation)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
+                        TextField("Port", text: $portInput)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 70)
                         Button("OK") {
-                            let trimmed = ipInput.trimmingCharacters(in: .whitespaces)
-                            guard !trimmed.isEmpty else { return }
-                            UserDefaults.standard.set(trimmed, forKey: "savedHost")
-                            tcp.updateHost(trimmed)
-                            withAnimation { showIPField = false }
+                            host = ipInput.trimmingCharacters(in: .whitespaces)
+                            port = portInput.trimmingCharacters(in: .whitespaces)
+                            UserDefaults.standard.set(host, forKey: "savedHost")
+                            UserDefaults.standard.set(port, forKey: "savedPort")
+                            addLog("⚙️ Config: \(host):\(port)")
+                            withAnimation { showSettings = false }
                         }
                         .buttonStyle(.borderedProminent)
                     }
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Boutons
-                TCPButton(label: "DOM", color: .blue, action: { tcp.send("dom") }, disabled: !tcp.connected)
-                TCPButton(label: "EXT", color: .green, action: { tcp.send("ext") }, disabled: !tcp.connected)
+                // Bouton test connexion
+                Button {
+                    isTesting = true
+                    lastStatus = "Test en cours..."
+                    addLog("🔌 Test connexion → \(host):\(port)")
+                    let p = UInt16(port) ?? 9000
+                    pingTCP(host: host, port: p) { result in
+                        DispatchQueue.main.async {
+                            lastStatus = result
+                            addLog(result)
+                            isTesting = false
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isTesting {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+                        Text(isTesting ? "Test..." : "Tester la connexion")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(isTesting ? Color.orange.opacity(0.6) : Color.orange)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(isTesting)
+
+                // Boutons DOM / EXT
+                TCPButton(label: "DOM", color: .blue, action: { send("dom") })
+                TCPButton(label: "EXT", color: .green, action: { send("ext") })
 
                 // Logs
                 VStack(alignment: .leading, spacing: 0) {
@@ -191,7 +210,7 @@ struct ContentView: View {
                     Divider()
                     ScrollView {
                         VStack(alignment: .leading, spacing: 2) {
-                            ForEach(tcp.logs, id: \.self) { log in
+                            ForEach(logs, id: \.self) { log in
                                 Text(log)
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundColor(.primary)
