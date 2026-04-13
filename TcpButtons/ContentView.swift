@@ -117,7 +117,7 @@ struct TCPButton: View {
                 .foregroundColor(.white)
                 .cornerRadius(20)
                 .scaleEffect(pressed ? 0.96 : 1.0)
-                .animation(.easeInOut(duration: 0.1), value: pressed)
+                .animation(.easeInOut(duration: 0.05), value: pressed)
         }
         .disabled(disabled)
         .simultaneousGesture(
