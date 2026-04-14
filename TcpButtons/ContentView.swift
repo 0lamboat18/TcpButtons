@@ -128,30 +128,36 @@ struct ContentView: View {
                 VStack(spacing: 12) {
 
                     // ── Barre du haut ──────────────────────────────────────
-                    HStack {
+                    HStack(spacing: 12) {
                         Text(lastStatus)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.gray)
                             .lineLimit(2)
-                        Spacer()
-                        // Bouton logs — toujours visible
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { showLogs.toggle() }
                         } label: {
                             Image(systemName: showLogs ? "list.bullet" : "list.bullet.slash")
-                                .foregroundColor(.secondary)
-                                .frame(width: 36, height: 36)   // zone de tap agrandie
-                                .contentShape(Rectangle())
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.gray)
                         }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+
                         Button {
                             withAnimation { showSettings.toggle() }
                         } label: {
                             Image(systemName: "gearshape.fill")
-                                .foregroundColor(.secondary)
-                                .frame(width: 36, height: 36)
-                                .contentShape(Rectangle())
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.gray)
                         }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGroupedBackground))
 
                     // ── Paramètres ────────────────────────────────────────
                     if showSettings {
@@ -210,16 +216,15 @@ struct ContentView: View {
                     .disabled(isTesting)
 
                     // ── Boutons DOM / EXT ─────────────────────────────────
-                    // Hauteur calculée : espace restant après les autres éléments fixes
                     let logsHeight: CGFloat = showLogs ? 200 : 0
-                    let fixedHeight: CGFloat = 44 + 44 + 12 * 5 + 30 // test + topbar + spacings + marge
+                    let fixedHeight: CGFloat = 44 + 44 + 12 * 5 + 30
                     let buttonsHeight = max(120, geo.size.height - fixedHeight - logsHeight - (showSettings ? 50 : 0))
 
                     VStack(spacing: 12) {
                         TCPButton(label: "DOM", color: .blue,  action: { send("dom") })
                         TCPButton(label: "EXT", color: .green, action: { send("ext") })
                     }
-                    .frame(height: min(buttonsHeight, 280)) // hauteur max 280 pt
+                    .frame(height: min(buttonsHeight, 280))
 
                     // ── Logs ──────────────────────────────────────────────
                     if showLogs {
