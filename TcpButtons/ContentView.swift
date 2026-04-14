@@ -125,8 +125,8 @@ struct ContentView: View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 12) {
-
-                // Status + réglages + toggle logs — toujours visible
+    
+                // Barre du haut — priorité maximale, ne sera jamais écrasée
                 HStack {
                     Text(lastStatus)
                         .font(.caption)
@@ -147,7 +147,8 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                     }
                 }
-
+                .layoutPriority(2)
+    
                 // Champs IP + Port
                 if showSettings {
                     HStack(spacing: 8) {
@@ -171,8 +172,9 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent)
                     }
                     .transition(.move(edge: .top).combined(with: .opacity))
+                    .layoutPriority(2)
                 }
-
+    
                 // Bouton test connexion
                 Button {
                     isTesting = true
@@ -203,15 +205,16 @@ struct ContentView: View {
                     .cornerRadius(12)
                 }
                 .disabled(isTesting)
-
-                // Boutons DOM / EXT — s'étendent si logs cachés
+                .layoutPriority(2)
+    
+                // Boutons DOM / EXT — prennent l'espace restant
                 VStack(spacing: 12) {
                     TCPButton(label: "DOM", color: .blue, action: { send("dom") })
                     TCPButton(label: "EXT", color: .green, action: { send("ext") })
                 }
-                .frame(maxHeight: showLogs ? 172 : .infinity)
-                .animation(.easeInOut(duration: 0.2), value: showLogs)
-
+                .frame(maxHeight: .infinity)
+                .layoutPriority(1)
+    
                 // Logs
                 if showLogs {
                     VStack(alignment: .leading, spacing: 0) {
@@ -237,6 +240,7 @@ struct ContentView: View {
                     .cornerRadius(12)
                     .frame(maxHeight: 250)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .layoutPriority(2)
                 }
             }
             .padding(16)
