@@ -76,8 +76,7 @@ struct TCPButton: View {
         Button { action() } label: {
             Text(label)
                 .font(.system(size: 32, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 80)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(pressed ? color.opacity(0.6) : color)
                 .foregroundColor(.white)
                 .cornerRadius(20)
@@ -100,6 +99,7 @@ struct ContentView: View {
     @State private var ipInput: String = UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100"
     @State private var portInput: String = UserDefaults.standard.string(forKey: "savedPort") ?? "9000"
     @State private var showSettings: Bool = false
+    @State private var showLogs: Bool = true
     @State private var lastStatus: String = "Prêt"
     @State private var logs: [String] = []
     @State private var isTesting: Bool = false
@@ -126,13 +126,20 @@ struct ContentView: View {
             Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 12) {
 
-                // Status + réglages
+                // Status + réglages + toggle logs
                 HStack {
                     Text(lastStatus)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                     Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) { showLogs.toggle() }
+                    } label: {
+                        Image(systemName: showLogs ? "list.bullet" : "list.bullet.slash")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.trailing, 10)
                     Button {
                         withAnimation { showSettings.toggle() }
                     } label: {
@@ -198,32 +205,53 @@ struct ContentView: View {
                 .disabled(isTesting)
 
                 // Boutons DOM / EXT
-                TCPButton(label: "DOM", color: .blue, action: { send("dom") })
-                TCPButton(label: "EXT", color: .green, action: { send("ext") })
-
-                // Logs
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Logs")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 8)
-                        .padding(.top, 6)
-                    Divider()
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(logs, id: \.self) { log in
-                                Text(log)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(.primary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 1)
-                            }
+                // Quand les logs sont cachés, ils s'étendent pour remplir l'espace restant
+                Group {
+                    if showLogs {
+                        // Taille fixe avec logs visibles
+                        VStack(spacing: 12) {
+                            TCPButton(label: "DOM", color: .blue, action: { send("dom") })
+                                .frame(height: 80)
+                            TCPButton(label: "EXT", color: .green, action: { send("ext") })
+                                .frame(height: 80)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        // Taille flexible sans logs
+                        VStack(spacing: 12) {
+                            TCPButton(label: "DOM", color: .blue, action: { send("dom") })
+                            TCPButton(label: "EXT", color: .green, action: { send("ext") })
+                        }
+                        .frame(maxHeight: .infinity)
                     }
                 }
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(12)
-                .frame(maxHeight: 250)
+                .animation(.easeInOut(duration: 0.25), value: showLogs)
+
+                // Logs
+                if showLogs {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Logs")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.top, 6)
+                        Divider()
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(logs, id: \.self) { log in
+                                    Text(log)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.primary)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 1)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(12)
+                    .frame(maxHeight: 250)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             .padding(16)
         }
