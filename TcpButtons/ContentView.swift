@@ -81,13 +81,13 @@ struct TCPButton: View {
                 .foregroundColor(.white)
                 .cornerRadius(20)
                 .scaleEffect(pressed ? 0.96 : 1.0)
-                .animation(.easeInOut(duration: 0.1), value: pressed)
+                .animation(.easeInOut(duration: 0.08), value: pressed)
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in pressed = true }
                 .onEnded { _ in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { pressed = false }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { pressed = false }
                 }
         )
     }
@@ -126,7 +126,7 @@ struct ContentView: View {
             Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 12) {
 
-                // Status + réglages + toggle logs
+                // Status + réglages + toggle logs — toujours visible
                 HStack {
                     Text(lastStatus)
                         .font(.caption)
@@ -134,7 +134,7 @@ struct ContentView: View {
                         .lineLimit(2)
                     Spacer()
                     Button {
-                        withAnimation(.easeInOut(duration: 0.25)) { showLogs.toggle() }
+                        withAnimation(.easeInOut(duration: 0.2)) { showLogs.toggle() }
                     } label: {
                         Image(systemName: showLogs ? "list.bullet" : "list.bullet.slash")
                             .foregroundColor(.secondary)
@@ -204,27 +204,13 @@ struct ContentView: View {
                 }
                 .disabled(isTesting)
 
-                // Boutons DOM / EXT
-                // Quand les logs sont cachés, ils s'étendent pour remplir l'espace restant
-                Group {
-                    if showLogs {
-                        // Taille fixe avec logs visibles
-                        VStack(spacing: 12) {
-                            TCPButton(label: "DOM", color: .blue, action: { send("dom") })
-                                .frame(height: 80)
-                            TCPButton(label: "EXT", color: .green, action: { send("ext") })
-                                .frame(height: 80)
-                        }
-                    } else {
-                        // Taille flexible sans logs
-                        VStack(spacing: 12) {
-                            TCPButton(label: "DOM", color: .blue, action: { send("dom") })
-                            TCPButton(label: "EXT", color: .green, action: { send("ext") })
-                        }
-                        .frame(maxHeight: .infinity)
-                    }
+                // Boutons DOM / EXT — s'étendent si logs cachés
+                VStack(spacing: 12) {
+                    TCPButton(label: "DOM", color: .blue, action: { send("dom") })
+                    TCPButton(label: "EXT", color: .green, action: { send("ext") })
                 }
-                .animation(.easeInOut(duration: 0.25), value: showLogs)
+                .frame(maxHeight: showLogs ? 172 : .infinity)
+                .animation(.easeInOut(duration: 0.2), value: showLogs)
 
                 // Logs
                 if showLogs {
