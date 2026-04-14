@@ -223,7 +223,7 @@ struct ContentView: View {
                         TCPButton(label: "DOM", color: .blue,  action: { send("dom") })
                         TCPButton(label: "EXT", color: .green, action: { send("ext") })
                     }
-                    .frame(height: min(buttonsHeight, 280))
+                    .frame(height: showLogs ? min(buttonsHeight, 280) : buttonsHeight)
 
                     // ── Logs ──────────────────────────────────────────────
                     if showLogs {
