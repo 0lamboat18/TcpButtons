@@ -122,128 +122,134 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 12) {
-    
-                // Barre du haut — priorité maximale, ne sera jamais écrasée
-                HStack {
-                    Text(lastStatus)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                    Spacer()
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { showLogs.toggle() }
-                    } label: {
-                        Image(systemName: showLogs ? "list.bullet" : "list.bullet.slash")
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.trailing, 10)
-                    Button {
-                        withAnimation { showSettings.toggle() }
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .layoutPriority(2)
-    
-                // Champs IP + Port
-                if showSettings {
-                    HStack(spacing: 8) {
-                        TextField("Adresse IP / host", text: $ipInput)
-                            .keyboardType(.numbersAndPunctuation)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                        TextField("Port", text: $portInput)
-                            .keyboardType(.numberPad)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .frame(width: 70)
-                        Button("OK") {
-                            host = ipInput.trimmingCharacters(in: .whitespaces)
-                            port = portInput.trimmingCharacters(in: .whitespaces)
-                            UserDefaults.standard.set(host, forKey: "savedHost")
-                            UserDefaults.standard.set(port, forKey: "savedPort")
-                            addLog("⚙️ Config: \(host):\(port)")
-                            withAnimation { showSettings = false }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .layoutPriority(2)
-                }
-    
-                // Bouton test connexion
-                Button {
-                    isTesting = true
-                    lastStatus = "Test en cours..."
-                    addLog("🔌 Test connexion → \(host):\(port)")
-                    let p = UInt16(port) ?? 9000
-                    pingTCP(host: host, port: p) { result in
-                        DispatchQueue.main.async {
-                            lastStatus = result
-                            addLog(result)
-                            isTesting = false
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        if isTesting {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        }
-                        Text(isTesting ? "Test..." : "Tester la connexion")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(isTesting ? Color.orange.opacity(0.6) : Color.orange)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .disabled(isTesting)
-                .layoutPriority(2)
-    
-                // Boutons DOM / EXT — prennent l'espace restant
+        GeometryReader { geo in
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
                 VStack(spacing: 12) {
-                    TCPButton(label: "DOM", color: .blue, action: { send("dom") })
-                    TCPButton(label: "EXT", color: .green, action: { send("ext") })
-                }
-                .frame(maxHeight: .infinity)
-                .layoutPriority(1)
-    
-                // Logs
-                if showLogs {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Logs")
-                            .font(.caption.bold())
-                            .padding(.horizontal, 8)
-                            .padding(.top, 6)
-                        Divider()
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 2) {
-                                ForEach(logs, id: \.self) { log in
-                                    Text(log)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(.primary)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 1)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // ── Barre du haut ──────────────────────────────────────
+                    HStack {
+                        Text(lastStatus)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                        Spacer()
+                        // Bouton logs — toujours visible
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { showLogs.toggle() }
+                        } label: {
+                            Image(systemName: showLogs ? "list.bullet" : "list.bullet.slash")
+                                .foregroundColor(.secondary)
+                                .frame(width: 36, height: 36)   // zone de tap agrandie
+                                .contentShape(Rectangle())
+                        }
+                        Button {
+                            withAnimation { showSettings.toggle() }
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .foregroundColor(.secondary)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
                         }
                     }
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
-                    .frame(maxHeight: 250)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .layoutPriority(2)
+
+                    // ── Paramètres ────────────────────────────────────────
+                    if showSettings {
+                        HStack(spacing: 8) {
+                            TextField("Adresse IP / host", text: $ipInput)
+                                .keyboardType(.numbersAndPunctuation)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                            TextField("Port", text: $portInput)
+                                .keyboardType(.numberPad)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .frame(width: 70)
+                            Button("OK") {
+                                host = ipInput.trimmingCharacters(in: .whitespaces)
+                                port = portInput.trimmingCharacters(in: .whitespaces)
+                                UserDefaults.standard.set(host, forKey: "savedHost")
+                                UserDefaults.standard.set(port, forKey: "savedPort")
+                                addLog("⚙️ Config: \(host):\(port)")
+                                withAnimation { showSettings = false }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    // ── Bouton test connexion ─────────────────────────────
+                    Button {
+                        isTesting = true
+                        lastStatus = "Test en cours..."
+                        addLog("🔌 Test connexion → \(host):\(port)")
+                        let p = UInt16(port) ?? 9000
+                        pingTCP(host: host, port: p) { result in
+                            DispatchQueue.main.async {
+                                lastStatus = result
+                                addLog(result)
+                                isTesting = false
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isTesting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            }
+                            Text(isTesting ? "Test..." : "Tester la connexion")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(isTesting ? Color.orange.opacity(0.6) : Color.orange)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isTesting)
+
+                    // ── Boutons DOM / EXT ─────────────────────────────────
+                    // Hauteur calculée : espace restant après les autres éléments fixes
+                    let logsHeight: CGFloat = showLogs ? 200 : 0
+                    let fixedHeight: CGFloat = 44 + 44 + 12 * 5 + 30 // test + topbar + spacings + marge
+                    let buttonsHeight = max(120, geo.size.height - fixedHeight - logsHeight - (showSettings ? 50 : 0))
+
+                    VStack(spacing: 12) {
+                        TCPButton(label: "DOM", color: .blue,  action: { send("dom") })
+                        TCPButton(label: "EXT", color: .green, action: { send("ext") })
+                    }
+                    .frame(height: min(buttonsHeight, 280)) // hauteur max 280 pt
+
+                    // ── Logs ──────────────────────────────────────────────
+                    if showLogs {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("Logs")
+                                .font(.caption.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.top, 6)
+                            Divider()
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    ForEach(Array(logs.enumerated()), id: \.offset) { _, log in
+                                        Text(log)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(.primary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 1)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
+                        .frame(height: 200)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
+                .padding(16)
             }
-            .padding(16)
         }
     }
 }
