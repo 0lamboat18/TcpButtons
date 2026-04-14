@@ -66,6 +66,59 @@ func pingTCP(host: String, port: UInt16 = 9000, completion: @escaping (String) -
     connection.start(queue: queue)
 }
 
+// ── Couleurs disponibles ───────────────────────────────────────────────────
+struct NamedColor: Identifiable, Equatable {
+    let id: String
+    let color: Color
+}
+
+let availableColors: [NamedColor] = [
+    NamedColor(id: "Bleu",   color: .blue),
+    NamedColor(id: "Vert",   color: .green),
+    NamedColor(id: "Rouge",  color: .red),
+    NamedColor(id: "Orange", color: .orange),
+    NamedColor(id: "Violet", color: .purple),
+    NamedColor(id: "Rose",   color: .pink),
+    NamedColor(id: "Cyan",   color: .cyan),
+    NamedColor(id: "Jaune",  color: .yellow),
+    NamedColor(id: "Gris",   color: .gray),
+]
+
+func colorFromId(_ id: String) -> Color {
+    availableColors.first { $0.id == id }?.color ?? .blue
+}
+
+// ── Sélecteur de couleur ───────────────────────────────────────────────────
+struct ButtonColorPicker: View {
+    let label: String
+    @Binding var selectedId: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableColors) { nc in
+                        Circle()
+                            .fill(nc.color)
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.primary, lineWidth: selectedId == nc.id ? 3 : 0)
+                                    .padding(2)
+                            )
+                            .onTapGesture { selectedId = nc.id }
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+    }
+}
+
+// ── Bouton principal ───────────────────────────────────────────────────────
 struct TCPButton: View {
     let label: String
     let color: Color
@@ -93,11 +146,22 @@ struct TCPButton: View {
     }
 }
 
+// ── Vue principale ─────────────────────────────────────────────────────────
 struct ContentView: View {
     @State private var host: String = UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100"
     @State private var port: String = UserDefaults.standard.string(forKey: "savedPort") ?? "9000"
     @State private var ipInput: String = UserDefaults.standard.string(forKey: "savedHost") ?? "192.168.1.100"
     @State private var portInput: String = UserDefaults.standard.string(forKey: "savedPort") ?? "9000"
+
+    @State private var btn1Label: String = UserDefaults.standard.string(forKey: "btn1Label") ?? "DOM"
+    @State private var btn2Label: String = UserDefaults.standard.string(forKey: "btn2Label") ?? "EXT"
+    @State private var btn1ColorId: String = UserDefaults.standard.string(forKey: "btn1Color") ?? "Bleu"
+    @State private var btn2ColorId: String = UserDefaults.standard.string(forKey: "btn2Color") ?? "Vert"
+    @State private var btn1LabelInput: String = UserDefaults.standard.string(forKey: "btn1Label") ?? "DOM"
+    @State private var btn2LabelInput: String = UserDefaults.standard.string(forKey: "btn2Label") ?? "EXT"
+    @State private var btn1ColorInput: String = UserDefaults.standard.string(forKey: "btn1Color") ?? "Bleu"
+    @State private var btn2ColorInput: String = UserDefaults.standard.string(forKey: "btn2Color") ?? "Vert"
+
     @State private var showSettings: Bool = false
     @State private var showLogs: Bool = true
     @State private var lastStatus: String = "Prêt"
@@ -121,6 +185,23 @@ struct ContentView: View {
         if logs.count > 20 { logs.removeLast() }
     }
 
+    func saveSettings() {
+        host = ipInput.trimmingCharacters(in: .whitespaces)
+        port = portInput.trimmingCharacters(in: .whitespaces)
+        btn1Label = btn1LabelInput.trimmingCharacters(in: .whitespaces).isEmpty ? "BTN1" : btn1LabelInput.trimmingCharacters(in: .whitespaces)
+        btn2Label = btn2LabelInput.trimmingCharacters(in: .whitespaces).isEmpty ? "BTN2" : btn2LabelInput.trimmingCharacters(in: .whitespaces)
+        btn1ColorId = btn1ColorInput
+        btn2ColorId = btn2ColorInput
+        UserDefaults.standard.set(host,        forKey: "savedHost")
+        UserDefaults.standard.set(port,        forKey: "savedPort")
+        UserDefaults.standard.set(btn1Label,   forKey: "btn1Label")
+        UserDefaults.standard.set(btn2Label,   forKey: "btn2Label")
+        UserDefaults.standard.set(btn1ColorId, forKey: "btn1Color")
+        UserDefaults.standard.set(btn2ColorId, forKey: "btn2Color")
+        addLog("⚙️ Config sauvegardée")
+        withAnimation { showSettings = false }
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -136,6 +217,15 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         Button {
+                            // Sync inputs avec valeurs actuelles à l'ouverture
+                            if !showSettings {
+                                ipInput      = host
+                                portInput    = port
+                                btn1LabelInput = btn1Label
+                                btn2LabelInput = btn2Label
+                                btn1ColorInput = btn1ColorId
+                                btn2ColorInput = btn2ColorId
+                            }
                             withAnimation { showSettings.toggle() }
                         } label: {
                             Image(systemName: "gearshape.fill")
@@ -151,7 +241,9 @@ struct ContentView: View {
 
                     // ── Paramètres ────────────────────────────────────────
                     if showSettings {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
+
+                            // IP / Port
                             HStack(spacing: 8) {
                                 TextField("Adresse IP / host", text: $ipInput)
                                     .keyboardType(.numbersAndPunctuation)
@@ -162,24 +254,70 @@ struct ContentView: View {
                                     .keyboardType(.numberPad)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .frame(width: 70)
-                                Button("OK") {
-                                    host = ipInput.trimmingCharacters(in: .whitespaces)
-                                    port = portInput.trimmingCharacters(in: .whitespaces)
-                                    UserDefaults.standard.set(host, forKey: "savedHost")
-                                    UserDefaults.standard.set(port, forKey: "savedPort")
-                                    addLog("⚙️ Config: \(host):\(port)")
-                                    withAnimation { showSettings = false }
-                                }
-                                .buttonStyle(.borderedProminent)
                             }
 
+                            Divider()
+
+                            // Bouton 1
+                            Text("Bouton 1")
+                                .font(.caption.bold())
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                TextField("Texte", text: $btn1LabelInput)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.characters)
+                                    .frame(width: 90)
+                                Text(btn1LabelInput.isEmpty ? "BTN1" : btn1LabelInput)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(colorFromId(btn1ColorInput))
+                                    .cornerRadius(8)
+                            }
+                            ButtonColorPicker(label: "Couleur", selectedId: $btn1ColorInput)
+
+                            Divider()
+
+                            // Bouton 2
+                            Text("Bouton 2")
+                                .font(.caption.bold())
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                TextField("Texte", text: $btn2LabelInput)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.characters)
+                                    .frame(width: 90)
+                                Text(btn2LabelInput.isEmpty ? "BTN2" : btn2LabelInput)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(colorFromId(btn2ColorInput))
+                                    .cornerRadius(8)
+                            }
+                            ButtonColorPicker(label: "Couleur", selectedId: $btn2ColorInput)
+
+                            Divider()
+
+                            // Logs toggle
                             Toggle(isOn: $showLogs) {
                                 Text("Afficher les logs")
                                     .font(.subheadline)
                                     .foregroundColor(.primary)
                             }
                             .padding(.horizontal, 4)
+
+                            // Bouton enregistrer
+                            Button("Enregistrer") { saveSettings() }
+                                .buttonStyle(.borderedProminent)
+                                .frame(maxWidth: .infinity)
                         }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
@@ -214,14 +352,14 @@ struct ContentView: View {
                     }
                     .disabled(isTesting)
 
-                    // ── Boutons DOM / EXT ─────────────────────────────────
+                    // ── Boutons principaux ────────────────────────────────
                     let logsHeight: CGFloat = showLogs ? 200 : 0
                     let fixedHeight: CGFloat = 44 + 44 + 12 * 5 + 30
                     let buttonsHeight = max(120, geo.size.height - fixedHeight - logsHeight - (showSettings ? 50 : 0))
 
                     VStack(spacing: 12) {
-                        TCPButton(label: "DOM", color: .blue,  action: { send("dom") })
-                        TCPButton(label: "EXT", color: .green, action: { send("ext") })
+                        TCPButton(label: btn1Label, color: colorFromId(btn1ColorId), action: { send(btn1Label.lowercased()) })
+                        TCPButton(label: btn2Label, color: colorFromId(btn2ColorId), action: { send(btn2Label.lowercased()) })
                     }
                     .frame(height: showLogs ? min(buttonsHeight, 280) : buttonsHeight)
 
