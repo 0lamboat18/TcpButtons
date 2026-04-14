@@ -358,8 +358,8 @@ struct ContentView: View {
                     let buttonsHeight = max(120, geo.size.height - fixedHeight - logsHeight - (showSettings ? 50 : 0))
 
                     VStack(spacing: 12) {
-                        TCPButton(label: btn1Label, color: colorFromId(btn1ColorId), action: { send(btn1Label.lowercased()) })
-                        TCPButton(label: btn2Label, color: colorFromId(btn2ColorId), action: { send(btn2Label.lowercased()) })
+                        TCPButton(label: btn1Label, color: colorFromId(btn1ColorId), action: { send("pg_" + btn1Label.lowercased() + " /// " + "true" + " ; " + btn1Label) })
+                        TCPButton(label: btn2Label, color: colorFromId(btn2ColorId), action: { send("pg_" + btn2Label.lowercased() + " /// " + "true" + " ; " + btn2Label) })
                     }
                     .frame(height: showLogs ? min(buttonsHeight, 280) : buttonsHeight)
 
