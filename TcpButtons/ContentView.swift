@@ -136,16 +136,6 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { showLogs.toggle() }
-                        } label: {
-                            Image(systemName: showLogs ? "list.bullet" : "list.bullet.slash")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.gray)
-                        }
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-
-                        Button {
                             withAnimation { showSettings.toggle() }
                         } label: {
                             Image(systemName: "gearshape.fill")
@@ -161,25 +151,34 @@ struct ContentView: View {
 
                     // ── Paramètres ────────────────────────────────────────
                     if showSettings {
-                        HStack(spacing: 8) {
-                            TextField("Adresse IP / host", text: $ipInput)
-                                .keyboardType(.numbersAndPunctuation)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                            TextField("Port", text: $portInput)
-                                .keyboardType(.numberPad)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .frame(width: 70)
-                            Button("OK") {
-                                host = ipInput.trimmingCharacters(in: .whitespaces)
-                                port = portInput.trimmingCharacters(in: .whitespaces)
-                                UserDefaults.standard.set(host, forKey: "savedHost")
-                                UserDefaults.standard.set(port, forKey: "savedPort")
-                                addLog("⚙️ Config: \(host):\(port)")
-                                withAnimation { showSettings = false }
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                TextField("Adresse IP / host", text: $ipInput)
+                                    .keyboardType(.numbersAndPunctuation)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+                                TextField("Port", text: $portInput)
+                                    .keyboardType(.numberPad)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .frame(width: 70)
+                                Button("OK") {
+                                    host = ipInput.trimmingCharacters(in: .whitespaces)
+                                    port = portInput.trimmingCharacters(in: .whitespaces)
+                                    UserDefaults.standard.set(host, forKey: "savedHost")
+                                    UserDefaults.standard.set(port, forKey: "savedPort")
+                                    addLog("⚙️ Config: \(host):\(port)")
+                                    withAnimation { showSettings = false }
+                                }
+                                .buttonStyle(.borderedProminent)
                             }
-                            .buttonStyle(.borderedProminent)
+
+                            Toggle(isOn: $showLogs) {
+                                Text("Afficher les logs")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                            }
+                            .padding(.horizontal, 4)
                         }
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
