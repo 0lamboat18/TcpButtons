@@ -38,7 +38,7 @@ func sendTCP(message: String, host: String, port: UInt16 = 9000, completion: @es
     connection.start(queue: queue)
 }
 
-func pingTCP(host: String, port: UInt16 = 9000, completion: @escaping (String) -> Void) {
+func pingTCP(host: String, port: UInt16 = 9000, resetMessage: String = "", completion: @escaping (String) -> Void) {
     let queue = DispatchQueue(label: "tcp.ping", qos: .userInteractive)
     let connection = NWConnection(
         host: NWEndpoint.Host(host),
@@ -51,8 +51,15 @@ func pingTCP(host: String, port: UInt16 = 9000, completion: @escaping (String) -
         switch state {
         case .ready:
             let ms = Int(Date().timeIntervalSince(start) * 1000)
-            completion("🟢 Connecté en \(ms)ms")
-            connection.cancel()
+            if !resetMessage.isEmpty, let data = (resetMessage + "\n").data(using: .utf8) {
+                connection.send(content: data, completion: .contentProcessed { _ in
+                    completion("🟢 Connecté en \(ms)ms — reset envoyé")
+                    connection.cancel()
+                })
+            } else {
+                completion("🟢 Connecté en \(ms)ms")
+                connection.cancel()
+            }
         case .failed(let error):
             completion("🔴 Échec: \(error.localizedDescription)")
             connection.cancel()
@@ -164,7 +171,7 @@ struct ContentView: View {
 
     @State private var showSettings: Bool = false
     @State private var showLogs: Bool = true
-    @State private var safetyMode: Bool = true  // ON par défaut à chaque lancement
+    @State private var safetyMode: Bool = true
     @State private var lastStatus: String = "Prêt"
     @State private var logs: [String] = []
     @State private var isTesting: Bool = false
@@ -244,7 +251,6 @@ struct ContentView: View {
                     if showSettings {
                         VStack(alignment: .leading, spacing: 12) {
 
-                            // IP / Port
                             HStack(spacing: 8) {
                                 TextField("Adresse IP / host", text: $ipInput)
                                     .keyboardType(.numbersAndPunctuation)
@@ -259,7 +265,6 @@ struct ContentView: View {
 
                             Divider()
 
-                            // Bouton 1
                             Text("Bouton 1")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
@@ -281,7 +286,6 @@ struct ContentView: View {
 
                             Divider()
 
-                            // Bouton 2
                             Text("Bouton 2")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
@@ -303,7 +307,6 @@ struct ContentView: View {
 
                             Divider()
 
-                            // Sécurité toggle
                             Toggle(isOn: $safetyMode) {
                                 Text("Sécurité")
                                     .font(.subheadline)
@@ -311,7 +314,6 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 4)
 
-                            // Logs toggle
                             Toggle(isOn: $showLogs) {
                                 Text("Afficher les logs")
                                     .font(.subheadline)
@@ -319,7 +321,6 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 4)
 
-                            // Bouton enregistrer
                             Button("Enregistrer") { saveSettings() }
                                 .buttonStyle(.borderedProminent)
                                 .frame(maxWidth: .infinity)
@@ -336,7 +337,8 @@ struct ContentView: View {
                         lastStatus = "Test en cours..."
                         addLog("🔌 Test connexion → \(host):\(port)")
                         let p = UInt16(port) ?? 9000
-                        pingTCP(host: host, port: p) { result in
+                        let resetMsg = "pg_" + btn1Label + " /// " + "false ; None"
+                        pingTCP(host: host, port: p, resetMessage: resetMsg) { result in
                             DispatchQueue.main.async {
                                 lastStatus = result
                                 addLog(result)
