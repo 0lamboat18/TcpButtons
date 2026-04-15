@@ -164,14 +164,16 @@ struct ContentView: View {
 
     @State private var showSettings: Bool = false
     @State private var showLogs: Bool = true
+    @State private var safetyMode: Bool = true  // ON par défaut à chaque lancement
     @State private var lastStatus: String = "Prêt"
     @State private var logs: [String] = []
     @State private var isTesting: Bool = false
 
     func send(_ message: String) {
         let p = UInt16(port) ?? 9000
-        addLog("📤 Envoi '\(message)' → \(host):\(p)")
-        sendTCP(message: message, host: host, port: p) { result in
+        let actualMessage = safetyMode ? "" : message
+        addLog("📤 Envoi '\(actualMessage)' → \(host):\(p)")
+        sendTCP(message: actualMessage, host: host, port: p) { result in
             DispatchQueue.main.async {
                 lastStatus = result
                 addLog(result)
@@ -205,7 +207,8 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+                (safetyMode ? Color.white : Color.black)
+                    .ignoresSafeArea()
                 VStack(spacing: 12) {
 
                     // ── Barre du haut ──────────────────────────────────────
@@ -217,7 +220,6 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         Button {
-                            // Sync inputs avec valeurs actuelles à l'ouverture
                             if !showSettings {
                                 ipInput      = host
                                 portInput    = port
@@ -237,7 +239,6 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
-                    .background(Color(.systemGroupedBackground))
 
                     // ── Paramètres ────────────────────────────────────────
                     if showSettings {
@@ -301,6 +302,14 @@ struct ContentView: View {
                             ButtonColorPicker(label: "Couleur", selectedId: $btn2ColorInput)
 
                             Divider()
+
+                            // Sécurité toggle
+                            Toggle(isOn: $safetyMode) {
+                                Text("Sécurité")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                            }
+                            .padding(.horizontal, 4)
 
                             // Logs toggle
                             Toggle(isOn: $showLogs) {
