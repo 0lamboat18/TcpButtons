@@ -3,20 +3,20 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>0ToLambo</string>
+	<string>TcpButtons</string>
+
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Connexion TCP au serveur de commandes.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_tcp.local</string>
-	</array>
+	<string>TcpButtons envoie vos messages aux appareils de votre réseau local.</string>
+
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>
