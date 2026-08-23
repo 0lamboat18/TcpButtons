@@ -1,0 +1,54 @@
+# Décrit le projet Xcode. Régénéré à chaque build par XcodeGen.
+# Ajouter un fichier Swift = le déposer dans TcpButtons/. Rien d'autre à faire.
+
+name: TcpButtons
+
+options:
+  bundleIdPrefix: com.tondomaine
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    # Fourni par Codemagic à chaque build. Vaut 1 en local.
+    CURRENT_PROJECT_VERSION: ${BUILD_NUMBER}
+
+targets:
+  TcpButtons:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+
+    sources:
+      - path: TcpButtons
+        excludes:
+          - "Info.plist"
+
+    settings:
+      base:
+        # À remplacer par un identifiant sur un domaine que tu possèdes.
+        PRODUCT_BUNDLE_IDENTIFIER: com.tondomaine.tcpbuttons
+        INFOPLIST_FILE: TcpButtons/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: 1        # iPhone uniquement
+        CODE_SIGN_STYLE: Manual
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+
+        # Orientations et apparence, injectées dans l'Info.plist généré
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_CFBundleDisplayName: TcpButtons
+
+schemes:
+  TcpButtons:
+    build:
+      targets:
+        TcpButtons: all
+    run:
+      config: Debug
+    archive:
+      config: Release
