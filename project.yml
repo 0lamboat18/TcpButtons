@@ -4,7 +4,7 @@
 name: TcpButtons
 
 options:
-  bundleIdPrefix: com.tondomaine
+  bundleIdPrefix: com.lamboat18
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
@@ -30,7 +30,7 @@ targets:
     settings:
       base:
         # À remplacer par un identifiant sur un domaine que tu possèdes.
-        PRODUCT_BUNDLE_IDENTIFIER: com.tondomaine.tcpbuttons
+        PRODUCT_BUNDLE_IDENTIFIER: com.lamboat18.tcpbuttons
         INFOPLIST_FILE: TcpButtons/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: 1        # iPhone uniquement
