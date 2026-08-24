@@ -100,6 +100,12 @@ struct ContentView: View {
     // MARK: - Actions
 
     private func send(_ button: TCPButtonConfig) {
+        guard !button.message.isEmpty else {
+            status = "Message vide"
+            log(.failure, "\(button.displayLabel) : aucun message défini dans les paramètres")
+            return
+        }
+
         guard !settings.dryRun else {
             log(.info, "Mode test — non envoyé : \(display(button.message))")
             status = "Mode test actif"
@@ -111,8 +117,7 @@ struct ContentView: View {
         TCPClient.send(
             button.message,
             to: settings.host,
-            port: settings.port,
-            lineEnding: settings.lineEnding
+            port: settings.port
         ) { result in
             switch result {
             case .success:
