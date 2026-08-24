@@ -4,24 +4,22 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
 
-    @State private var portText: String = ""
+    @State private var portText = ""
 
     var body: some View {
         NavigationStack {
             Form {
                 destinationSection
-
                 ForEach($settings.buttons) { $button in
-                    buttonSection(for: $button)
+                    buttonSection($button)
                 }
-
                 behaviourSection
             }
-            .navigationTitle("Paramètres")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Terminé") {
+                    Button("Done") {
                         commitPort()
                         dismiss()
                     }
@@ -31,11 +29,9 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Sections
-
     private var destinationSection: some View {
         Section {
-            LabeledContent("Adresse") {
+            LabeledContent("Host") {
                 TextField("192.168.1.100", text: $settings.host)
                     .keyboardType(.numbersAndPunctuation)
                     .autocorrectionDisabled()
@@ -46,29 +42,29 @@ struct SettingsView: View {
                 TextField("9000", text: $portText)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
-                    .onSubmit { commitPort() }
+                    .onSubmit(commitPort)
             }
         } header: {
             Text("Destination")
         } footer: {
-            Text("Adresse IP ou nom d'hôte du serveur qui reçoit les messages.")
+            Text("IP address or hostname of the server receiving the messages.")
         }
     }
 
-    private func buttonSection(for button: Binding<TCPButtonConfig>) -> some View {
+    private func buttonSection(_ button: Binding<TCPButtonConfig>) -> some View {
         Section {
-            LabeledContent("Titre") {
-                TextField("Titre affiché", text: button.label)
+            LabeledContent("Title") {
+                TextField("Button title", text: button.label)
                     .autocorrectionDisabled()
                     .multilineTextAlignment(.trailing)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Message envoyé")
+                Text("Message")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                TextField("Touchez ici pour écrire", text: button.message, axis: .vertical)
+                TextField("Tap to type", text: button.message, axis: .vertical)
                     .lineLimit(1...4)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
@@ -88,45 +84,40 @@ struct SettingsView: View {
             ColorRow(selectedId: button.colorId)
         } header: {
             Text(button.wrappedValue.displayLabel)
+        } footer: {
+            Text("Sent exactly as typed, UTF-8, with no added characters.")
         }
     }
 
     private var behaviourSection: some View {
         Section {
-            Toggle("Afficher le journal", isOn: $settings.showLogs)
-            Toggle("Mode test", isOn: $settings.dryRun)
+            Toggle("Show log", isOn: $settings.showLog)
+            Toggle("Test mode", isOn: $settings.testMode)
         } footer: {
-            Text("En mode test, les boutons affichent le message dans le journal sans rien envoyer.")
+            Text("In test mode, buttons log the message without opening a connection.")
         }
     }
 
-    // MARK: - Validation
-
     private func commitPort() {
-        let digits = portText.filter(\.isNumber)
-        if let value = UInt16(digits), value > 0 {
+        if let value = UInt16(portText.filter(\.isNumber)), value > 0 {
             settings.port = value
         }
         portText = String(settings.port)
     }
 }
 
-// MARK: - Sélecteur de couleur
-
 private struct ColorRow: View {
     @Binding var selectedId: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Couleur")
+            Text("Color")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
                 ForEach(Palette.all) { named in
-                    Button {
-                        selectedId = named.id
-                    } label: {
+                    Button { selectedId = named.id } label: {
                         Circle()
                             .fill(named.color)
                             .frame(width: 28, height: 28)
