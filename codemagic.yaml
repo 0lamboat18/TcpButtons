@@ -1,19 +1,20 @@
 workflows:
 
-  # ── Vérification rapide à chaque push ───────────────────────────────────
-  # Ne signe rien, ne publie rien. Sert juste à savoir si ça compile.
-  ios-check:
-    name: Compilation
+  ios-sideload:
+    name: IPA non signée (sideload)
     max_build_duration: 30
     instance_type: mac_mini_m2
+
     environment:
       xcode: latest
+
     triggering:
       events:
         - push
       branch_patterns:
         - pattern: main
           include: true
+
     scripts:
       - name: Installer XcodeGen
         script: brew install xcodegen
@@ -21,85 +22,37 @@ workflows:
       - name: Générer le projet Xcode
         script: xcodegen generate
 
-      - name: Compiler
+      - name: Compiler pour appareil, sans signature
         script: |
           xcodebuild \
             -project TcpButtons.xcodeproj \
             -scheme TcpButtons \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
             build
-    publishing:
-      email:
-        recipients:
-          - ton.email@exemple.fr
-        notify:
-          success: false
-          failure: true
 
-  # ── Build signé envoyé sur TestFlight ───────────────────────────────────
-  # À lancer manuellement depuis l'interface Codemagic.
-  ios-testflight:
-    name: TestFlight
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-
-    integrations:
-      # Nom donné à ta clé API dans Codemagic (Teams › Integrations).
-      app_store_connect: AppStoreConnect
-
-    environment:
-      xcode: latest
-      groups:
-        - appstore            # doit contenir APP_STORE_APP_ID
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.tondomaine.tcpbuttons
-      vars:
-        BUNDLE_ID: "com.tondomaine.tcpbuttons"
-
-    scripts:
-      - name: Installer XcodeGen
-        script: brew install xcodegen
-
-      - name: Numéro de build incrémental
+      - name: Empaqueter l'IPA
         script: |
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo "0")
-          export BUILD_NUMBER=$(($LATEST + 1))
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
-          echo "Build number : $BUILD_NUMBER"
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Aucun .app produit — la compilation a échoué."
+            exit 1
+          fi
+          echo "Application : $APP_PATH"
 
-      - name: Générer le projet Xcode
-        script: xcodegen generate
-
-      - name: Préparer la signature
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-          xcode-project use-profiles
-
-      - name: Construire l'IPA
-        script: |
-          xcode-project build-ipa \
-            --project TcpButtons.xcodeproj \
-            --scheme TcpButtons \
-            --config Release
+          rm -rf Payload TcpButtons.ipa
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qry TcpButtons.ipa Payload
+          echo "IPA créée :"
+          ls -lh TcpButtons.ipa
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - TcpButtons.ipa
       - /tmp/xcodebuild_logs/*.log
-
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-        # Passe à true seulement quand tu es prêt à soumettre en review.
-        submit_to_app_store: false
-      email:
-        recipients:
-          - ton.email@exemple.fr
