@@ -50,7 +50,6 @@ final class AppSettings: ObservableObject {
 
     @Published var host: String                { didSet { save() } }
     @Published var port: UInt16                { didSet { save() } }
-    @Published var lineEnding: LineEnding      { didSet { save() } }
     @Published var buttons: [TCPButtonConfig]  { didSet { save() } }
     @Published var showLogs: Bool              { didSet { save() } }
     @Published var dryRun: Bool                { didSet { save() } }
@@ -61,15 +60,14 @@ final class AppSettings: ObservableObject {
     private enum Key {
         static let host = "host"
         static let port = "port"
-        static let lineEnding = "lineEnding"
         static let buttons = "buttons"
         static let showLogs = "showLogs"
         static let dryRun = "dryRun"
     }
 
     static let defaultButtons: [TCPButtonConfig] = [
-        TCPButtonConfig(label: "Bouton 1", message: "ON",  colorId: "blue"),
-        TCPButtonConfig(label: "Bouton 2", message: "OFF", colorId: "green")
+        TCPButtonConfig(label: "Bouton 1", message: "", colorId: "blue"),
+        TCPButtonConfig(label: "Bouton 2", message: "", colorId: "green")
     ]
 
     init(defaults: UserDefaults = .standard) {
@@ -80,9 +78,6 @@ final class AppSettings: ObservableObject {
 
         let storedPort = defaults.integer(forKey: Key.port)
         port = (1...65535).contains(storedPort) ? UInt16(storedPort) : 9000
-
-        lineEnding = defaults.string(forKey: Key.lineEnding)
-            .flatMap(LineEnding.init(rawValue:)) ?? .lf
 
         if let data = defaults.data(forKey: Key.buttons),
            let decoded = try? JSONDecoder().decode([TCPButtonConfig].self, from: data),
@@ -102,7 +97,6 @@ final class AppSettings: ObservableObject {
         guard !isLoading else { return }
         defaults.set(host, forKey: Key.host)
         defaults.set(Int(port), forKey: Key.port)
-        defaults.set(lineEnding.rawValue, forKey: Key.lineEnding)
         defaults.set(showLogs, forKey: Key.showLogs)
         defaults.set(dryRun, forKey: Key.dryRun)
         if let data = try? JSONEncoder().encode(buttons) {
