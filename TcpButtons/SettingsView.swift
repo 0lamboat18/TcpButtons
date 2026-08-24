@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var echo: EchoServer
     @Environment(\.dismiss) private var dismiss
 
     @State private var portText = ""
@@ -10,6 +11,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 destinationSection
+                echoSection
                 ForEach($settings.buttons) { $button in
                     buttonSection($button)
                 }
@@ -48,6 +50,39 @@ struct SettingsView: View {
             Text("Destination")
         } footer: {
             Text("IP address or hostname of the server receiving the messages.")
+        }
+    }
+
+    private var echoSection: some View {
+        Section {
+            Toggle("Local echo server", isOn: Binding(
+                get: { echo.isRunning },
+                set: { running in
+                    if running {
+                        echo.start(port: 9000)
+                    } else {
+                        echo.stop()
+                    }
+                }
+            ))
+
+            if echo.isRunning {
+                Button("Point app at echo server") {
+                    settings.host = "127.0.0.1"
+                    settings.port = echo.port
+                    portText = String(echo.port)
+                }
+            }
+
+            if let error = echo.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Text("Echo server")
+        } footer: {
+            Text("Starts a TCP server on 127.0.0.1 that echoes back whatever it receives. Use it to try the app without any external hardware.")
         }
     }
 
