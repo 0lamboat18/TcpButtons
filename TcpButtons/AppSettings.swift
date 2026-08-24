@@ -1,7 +1,5 @@
 import SwiftUI
 
-// MARK: - Couleurs
-
 struct NamedColor: Identifiable, Equatable {
     let id: String
     let color: Color
@@ -25,9 +23,6 @@ enum Palette {
     }
 }
 
-// MARK: - Bouton
-
-/// Un bouton de l'écran principal : ce qu'on lit dessus, et ce qu'il envoie.
 struct TCPButtonConfig: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var label: String
@@ -36,23 +31,24 @@ struct TCPButtonConfig: Identifiable, Codable, Equatable {
 
     var color: Color { Palette.color(colorId) }
 
-    /// Libellé affiché, avec repli si l'utilisateur a tout effacé.
     var displayLabel: String {
-        label.trimmingCharacters(in: .whitespaces).isEmpty ? "Sans nom" : label
+        label.trimmingCharacters(in: .whitespaces).isEmpty ? "Untitled" : label
     }
 }
 
-// MARK: - Réglages
-
-/// Source de vérité unique de l'app, persistée dans `UserDefaults`.
 @MainActor
 final class AppSettings: ObservableObject {
 
-    @Published var host: String                { didSet { save() } }
-    @Published var port: UInt16                { didSet { save() } }
-    @Published var buttons: [TCPButtonConfig]  { didSet { save() } }
-    @Published var showLogs: Bool              { didSet { save() } }
-    @Published var dryRun: Bool                { didSet { save() } }
+    @Published var host: String               { didSet { save() } }
+    @Published var port: UInt16               { didSet { save() } }
+    @Published var buttons: [TCPButtonConfig] { didSet { save() } }
+    @Published var showLog: Bool              { didSet { save() } }
+    @Published var testMode: Bool             { didSet { save() } }
+
+    static let defaultButtons: [TCPButtonConfig] = [
+        TCPButtonConfig(label: "Button 1", message: "", colorId: "blue"),
+        TCPButtonConfig(label: "Button 2", message: "", colorId: "green")
+    ]
 
     private let defaults: UserDefaults
     private var isLoading = false
@@ -61,20 +57,15 @@ final class AppSettings: ObservableObject {
         static let host = "host"
         static let port = "port"
         static let buttons = "buttons"
-        static let showLogs = "showLogs"
-        static let dryRun = "dryRun"
+        static let showLog = "showLog"
+        static let testMode = "testMode"
     }
-
-    static let defaultButtons: [TCPButtonConfig] = [
-        TCPButtonConfig(label: "Bouton 1", message: "", colorId: "blue"),
-        TCPButtonConfig(label: "Bouton 2", message: "", colorId: "green")
-    ]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         isLoading = true
 
-        host = defaults.string(forKey: Key.host) ?? "192.168.1.100"
+        host = defaults.string(forKey: Key.host) ?? ""
 
         let storedPort = defaults.integer(forKey: Key.port)
         port = (1...65535).contains(storedPort) ? UInt16(storedPort) : 9000
@@ -87,8 +78,8 @@ final class AppSettings: ObservableObject {
             buttons = Self.defaultButtons
         }
 
-        showLogs = defaults.object(forKey: Key.showLogs) as? Bool ?? true
-        dryRun = defaults.object(forKey: Key.dryRun) as? Bool ?? false
+        showLog = defaults.object(forKey: Key.showLog) as? Bool ?? true
+        testMode = defaults.object(forKey: Key.testMode) as? Bool ?? false
 
         isLoading = false
     }
@@ -97,17 +88,16 @@ final class AppSettings: ObservableObject {
         guard !isLoading else { return }
         defaults.set(host, forKey: Key.host)
         defaults.set(Int(port), forKey: Key.port)
-        defaults.set(showLogs, forKey: Key.showLogs)
-        defaults.set(dryRun, forKey: Key.dryRun)
+        defaults.set(showLog, forKey: Key.showLog)
+        defaults.set(testMode, forKey: Key.testMode)
         if let data = try? JSONEncoder().encode(buttons) {
             defaults.set(data, forKey: Key.buttons)
         }
     }
 }
 
-// MARK: - Journal
-
 struct LogEntry: Identifiable {
+
     enum Kind {
         case sent, success, failure, info
 
@@ -122,10 +112,9 @@ struct LogEntry: Identifiable {
 
         var tint: Color {
             switch self {
-            case .sent:    return .secondary
-            case .success: return .green
-            case .failure: return .red
-            case .info:    return .secondary
+            case .sent, .info: return .secondary
+            case .success:     return .green
+            case .failure:     return .red
             }
         }
     }
@@ -135,9 +124,7 @@ struct LogEntry: Identifiable {
     let kind: Kind
     let text: String
 
-    var timestamp: String {
-        LogEntry.formatter.string(from: date)
-    }
+    var timestamp: String { LogEntry.formatter.string(from: date) }
 
     private static let formatter: DateFormatter = {
         let formatter = DateFormatter()
