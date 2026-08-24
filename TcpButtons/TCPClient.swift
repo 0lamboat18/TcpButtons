@@ -4,35 +4,25 @@ import Network
 enum TCPError: LocalizedError {
     case emptyHost
     case invalidPort
-    case encodingFailed
+    case invalidMessage
     case timedOut(TimeInterval)
     case network(String)
 
     var errorDescription: String? {
         switch self {
-        case .emptyHost:
-            return "Renseigne une adresse dans les paramètres."
-        case .invalidPort:
-            return "Le port doit être compris entre 1 et 65535."
-        case .encodingFailed:
-            return "Ce message ne peut pas être encodé en UTF-8."
-        case .timedOut(let seconds):
-            return "Aucune réponse après \(Int(seconds)) s."
-        case .network(let description):
-            return description
+        case .emptyHost: return "No host set. Open settings to add one."
+        case .invalidPort: return "Port must be between 1 and 65535."
+        case .invalidMessage: return "Message is empty or not valid UTF-8."
+        case .timedOut(let seconds): return "No response after \(Int(seconds))s."
+        case .network(let description): return description
         }
     }
 }
 
-/// Client TCP « one-shot » : ouvre une connexion, envoie le message, referme.
-///
-/// Chaque appel invoque `completion` exactement une fois, sur la file principale.
 enum TCPClient {
 
     private static let queue = DispatchQueue(label: "app.tcpbuttons.network")
 
-    /// Ouvre une connexion et envoie `message`.
-    /// - Returns: via `completion`, la latence de connexion en secondes.
     static func send(
         _ message: String,
         to host: String,
@@ -41,32 +31,30 @@ enum TCPClient {
         completion: @escaping (Result<TimeInterval, TCPError>) -> Void
     ) {
         guard let payload = message.data(using: .utf8), !payload.isEmpty else {
-            DispatchQueue.main.async { completion(.failure(.encodingFailed)) }
+            DispatchQueue.main.async { completion(.failure(.invalidMessage)) }
             return
         }
-        connect(to: host, port: port, sending: payload, timeout: timeout, completion: completion)
+        open(host, port, payload, timeout, completion)
     }
 
-    /// Ouvre une connexion sans rien envoyer, pour vérifier que l'hôte répond.
     static func ping(
         to host: String,
         port: UInt16,
         timeout: TimeInterval = 5,
         completion: @escaping (Result<TimeInterval, TCPError>) -> Void
     ) {
-        connect(to: host, port: port, sending: nil, timeout: timeout, completion: completion)
+        open(host, port, nil, timeout, completion)
     }
 
-    // MARK: - Implémentation
-
-    private static func connect(
-        to host: String,
-        port: UInt16,
-        sending payload: Data?,
-        timeout: TimeInterval,
-        completion: @escaping (Result<TimeInterval, TCPError>) -> Void
+    private static func open(
+        _ host: String,
+        _ port: UInt16,
+        _ payload: Data?,
+        _ timeout: TimeInterval,
+        _ completion: @escaping (Result<TimeInterval, TCPError>) -> Void
     ) {
         let host = host.trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard !host.isEmpty else {
             DispatchQueue.main.async { completion(.failure(.emptyHost)) }
             return
@@ -76,16 +64,10 @@ enum TCPClient {
             return
         }
 
-        let connection = NWConnection(
-            host: NWEndpoint.Host(host),
-            port: endpointPort,
-            using: .tcp
-        )
+        let connection = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: .tcp)
         let start = Date()
         let once = OnceGuard()
 
-        // Toutes les écritures de `once` ont lieu sur `queue` : le handler de
-        // NWConnection y est déjà confiné, et le timeout y est planifié.
         func finish(_ result: Result<TimeInterval, TCPError>) {
             once.run {
                 connection.stateUpdateHandler = nil
@@ -109,31 +91,21 @@ enum TCPClient {
                         finish(.success(latency))
                     }
                 })
-
             case .failed(let error):
                 finish(.failure(.network(error.localizedDescription)))
-
             case .cancelled:
-                finish(.failure(.network("Connexion interrompue.")))
-
+                finish(.failure(.network("Connection closed.")))
             case .setup, .preparing, .waiting:
-                // `.waiting` n'est pas terminal : la connexion peut encore
-                // aboutir. On laisse le timeout trancher.
                 break
-
             @unknown default:
                 break
             }
         }
 
-        queue.asyncAfter(deadline: .now() + timeout) {
-            finish(.failure(.timedOut(timeout)))
-        }
-
+        queue.asyncAfter(deadline: .now() + timeout) { finish(.failure(.timedOut(timeout))) }
         connection.start(queue: queue)
     }
 
-    /// Garantit qu'un bloc ne s'exécute qu'une fois. À n'utiliser que depuis `queue`.
     private final class OnceGuard {
         private var hasRun = false
 
