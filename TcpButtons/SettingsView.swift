@@ -10,7 +10,6 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 destinationSection
-                formatSection
 
                 ForEach($settings.buttons) { $button in
                     buttonSection(for: $button)
@@ -56,18 +55,6 @@ struct SettingsView: View {
         }
     }
 
-    private var formatSection: some View {
-        Section {
-            Picker("Fin de ligne", selection: $settings.lineEnding) {
-                ForEach(LineEnding.allCases) { ending in
-                    Text(ending.label).tag(ending)
-                }
-            }
-        } footer: {
-            Text("Caractères ajoutés après chaque message. Beaucoup de serveurs attendent \\n.")
-        }
-    }
-
     private func buttonSection(for button: Binding<TCPButtonConfig>) -> some View {
         Section {
             LabeledContent("Titre") {
@@ -80,11 +67,22 @@ struct SettingsView: View {
                 Text("Message envoyé")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("Texte envoyé au serveur", text: button.message, axis: .vertical)
+
+                TextField("Touchez ici pour écrire", text: button.message, axis: .vertical)
                     .lineLimit(1...4)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .font(.system(.body, design: .monospaced))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.tertiarySystemFill))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(Color.secondary.opacity(0.4), lineWidth: 1)
+                            }
+                    }
             }
 
             ColorRow(selectedId: button.colorId)
