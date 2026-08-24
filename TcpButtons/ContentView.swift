@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var settings = AppSettings()
+    @StateObject private var echo = EchoServer()
 
     @State private var log: [LogEntry] = []
     @State private var status = "Ready"
@@ -15,6 +16,15 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
+                if echo.isRunning {
+                    Label("Echo server running on 127.0.0.1:\(echo.port)", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.green)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                }
+
                 if settings.testMode {
                     Label("Test mode — nothing is sent", systemImage: "eye")
                         .font(.footnote.weight(.medium))
@@ -58,7 +68,12 @@ struct ContentView: View {
                     .padding(.bottom, 4)
             }
             .sheet(isPresented: $showSettings) {
-                SettingsView(settings: settings)
+                SettingsView(settings: settings, echo: echo)
+            }
+            .onAppear {
+                echo.onReceive = { message in
+                    append(.success, "Echo received: \(message)")
+                }
             }
         }
     }
