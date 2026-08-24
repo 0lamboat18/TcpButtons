@@ -1,31 +1,6 @@
 import Foundation
 import Network
 
-/// Terminaison ajoutée à la fin de chaque message envoyé.
-enum LineEnding: String, CaseIterable, Codable, Identifiable {
-    case none
-    case lf
-    case crlf
-
-    var id: String { rawValue }
-
-    var suffix: String {
-        switch self {
-        case .none: return ""
-        case .lf:   return "\n"
-        case .crlf: return "\r\n"
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .none: return "Aucune"
-        case .lf:   return #"\n"#
-        case .crlf: return #"\r\n"#
-        }
-    }
-}
-
 enum TCPError: LocalizedError {
     case emptyHost
     case invalidPort
@@ -62,11 +37,10 @@ enum TCPClient {
         _ message: String,
         to host: String,
         port: UInt16,
-        lineEnding: LineEnding = .lf,
         timeout: TimeInterval = 5,
         completion: @escaping (Result<TimeInterval, TCPError>) -> Void
     ) {
-        guard let payload = (message + lineEnding.suffix).data(using: .utf8) else {
+        guard let payload = message.data(using: .utf8), !payload.isEmpty else {
             DispatchQueue.main.async { completion(.failure(.encodingFailed)) }
             return
         }
