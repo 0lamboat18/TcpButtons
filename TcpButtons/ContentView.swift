@@ -3,38 +3,49 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var settings = AppSettings()
 
-    @State private var logs: [LogEntry] = []
-    @State private var status: String = "Prêt"
+    @State private var log: [LogEntry] = []
+    @State private var status = "Ready"
     @State private var isTesting = false
     @State private var showSettings = false
+
+    private var destination: String {
+        settings.host.isEmpty ? "No destination" : "\(settings.host):\(settings.port)"
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                if settings.dryRun {
-                    dryRunBanner
+                if settings.testMode {
+                    Label("Test mode — nothing is sent", systemImage: "eye")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 }
 
-                buttonStack
+                VStack(spacing: 12) {
+                    ForEach(settings.buttons) { button in
+                        SendButton(config: button) { send(button) }
+                    }
+                }
+                .frame(maxHeight: .infinity)
 
                 testButton
 
-                if settings.showLogs {
-                    LogView(entries: logs)
-                        .frame(height: 180)
+                if settings.showLog {
+                    LogView(entries: log).frame(height: 180)
                 }
             }
             .padding(16)
-            .navigationTitle(destinationLabel)
+            .navigationTitle(destination)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
+                    Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
                     }
-                    .accessibilityLabel("Paramètres")
+                    .accessibilityLabel("Settings")
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -52,41 +63,13 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Sous-vues
-
-    private var destinationLabel: String {
-        "\(settings.host):\(settings.port)"
-    }
-
-    private var dryRunBanner: some View {
-        Label("Mode test — rien n'est envoyé", systemImage: "eye")
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(.orange)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private var buttonStack: some View {
-        VStack(spacing: 12) {
-            ForEach(settings.buttons) { button in
-                SendButton(config: button) { send(button) }
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
-
     private var testButton: some View {
-        Button {
-            testConnection()
-        } label: {
+        Button(action: testConnection) {
             HStack(spacing: 8) {
                 if isTesting {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(0.8)
+                    ProgressView().tint(.white).scaleEffect(0.8)
                 }
-                Text(isTesting ? "Test en cours" : "Tester la connexion")
+                Text(isTesting ? "Testing" : "Test connection")
                     .font(.system(size: 16, weight: .semibold))
             }
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -97,70 +80,56 @@ struct ContentView: View {
         .disabled(isTesting)
     }
 
-    // MARK: - Actions
-
     private func send(_ button: TCPButtonConfig) {
         guard !button.message.isEmpty else {
-            status = "Message vide"
-            log(.failure, "\(button.displayLabel) : aucun message défini dans les paramètres")
+            status = "No message set"
+            append(.failure, "\(button.displayLabel): no message set in settings")
             return
         }
 
-        guard !settings.dryRun else {
-            log(.info, "Mode test — non envoyé : \(display(button.message))")
-            status = "Mode test actif"
+        guard !settings.testMode else {
+            status = "Test mode"
+            append(.info, "Not sent: \(button.message)")
             return
         }
 
-        log(.sent, "\(display(button.message)) → \(destinationLabel)")
+        append(.sent, "\(button.message) → \(destination)")
 
-        TCPClient.send(
-            button.message,
-            to: settings.host,
-            port: settings.port
-        ) { result in
+        TCPClient.send(button.message, to: settings.host, port: settings.port) { result in
             switch result {
             case .success:
-                status = "Envoyé"
-                log(.success, "\(button.displayLabel) envoyé")
+                status = "Sent"
+                append(.success, "\(button.displayLabel) sent")
             case .failure(let error):
-                let message = error.localizedDescription
-                status = message
-                log(.failure, message)
+                status = error.localizedDescription
+                append(.failure, error.localizedDescription)
             }
         }
     }
 
     private func testConnection() {
         isTesting = true
-        status = "Connexion à \(destinationLabel)…"
+        status = "Connecting to \(destination)"
 
         TCPClient.ping(to: settings.host, port: settings.port) { result in
             isTesting = false
             switch result {
             case .success(let latency):
                 let ms = Int(latency * 1000)
-                status = "Connecté en \(ms) ms"
-                log(.success, "Connecté à \(destinationLabel) en \(ms) ms")
+                status = "Connected in \(ms) ms"
+                append(.success, "Connected to \(destination) in \(ms) ms")
             case .failure(let error):
-                let message = error.localizedDescription
-                status = message
-                log(.failure, message)
+                status = error.localizedDescription
+                append(.failure, error.localizedDescription)
             }
         }
     }
 
-    private func display(_ message: String) -> String {
-        message.isEmpty ? "(message vide)" : message
-    }
-
-    private func log(_ kind: LogEntry.Kind, _ text: String) {
-        logs.insert(LogEntry(kind: kind, text: text), at: 0)
-        if logs.count > 50 { logs.removeLast() }
+    private func append(_ kind: LogEntry.Kind, _ text: String) {
+        log.insert(LogEntry(kind: kind, text: text), at: 0)
+        if log.count > 50 { log.removeLast() }
     }
 }
-
-// MARK: - Bouton d'envoi
 
 private struct SendButton: View {
     let config: TCPButtonConfig
@@ -176,12 +145,11 @@ private struct SendButton: View {
                 .foregroundStyle(.white)
                 .background(config.color, in: RoundedRectangle(cornerRadius: 20))
         }
-        .buttonStyle(PressEffectStyle())
-        .accessibilityHint("Envoie « \(config.message) »")
+        .buttonStyle(PressEffect())
     }
 }
 
-private struct PressEffectStyle: ButtonStyle {
+private struct PressEffect: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -190,14 +158,12 @@ private struct PressEffectStyle: ButtonStyle {
     }
 }
 
-// MARK: - Journal
-
 private struct LogView: View {
     let entries: [LogEntry]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Journal")
+            Text("Log")
                 .font(.caption.bold())
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -205,7 +171,7 @@ private struct LogView: View {
             Divider()
 
             if entries.isEmpty {
-                Text("Les envois apparaîtront ici.")
+                Text("Activity will appear here.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -217,10 +183,8 @@ private struct LogView: View {
                                 Image(systemName: entry.kind.symbol)
                                     .foregroundStyle(entry.kind.tint)
                                     .font(.system(size: 10))
-                                Text(entry.timestamp)
-                                    .foregroundStyle(.secondary)
-                                Text(entry.text)
-                                    .textSelection(.enabled)
+                                Text(entry.timestamp).foregroundStyle(.secondary)
+                                Text(entry.text).textSelection(.enabled)
                             }
                             .font(.system(size: 11, design: .monospaced))
                             .frame(maxWidth: .infinity, alignment: .leading)
