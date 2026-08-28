@@ -59,9 +59,6 @@ workflows:
       vars:
         BUNDLE_ID: "com.0tolambo.tcpbuttons"
         XCODE_SCHEME: "TcpButtons"
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: $BUNDLE_ID
     triggering:
       events:
         - push
