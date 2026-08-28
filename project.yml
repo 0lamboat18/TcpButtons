@@ -30,7 +30,7 @@ targets:
     settings:
       base:
         # À remplacer par un identifiant sur un domaine que tu possèdes.
-        PRODUCT_BUNDLE_IDENTIFIER: com.lamboat18.tcpbuttons
+        PRODUCT_BUNDLE_IDENTIFIER: com.0tolambo.tcpbuttons
         INFOPLIST_FILE: TcpButtons/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: 1        # iPhone uniquement
