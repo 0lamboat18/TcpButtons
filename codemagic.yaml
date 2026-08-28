@@ -53,11 +53,11 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: codemagic_appstore
+      app_store_connect: TcpButtons
     environment:
       xcode: latest
       vars:
-        BUNDLE_ID: "com.tonnom.tcpbuttons"
+        BUNDLE_ID: "com.0tolambo.tcpbuttons"
         XCODE_SCHEME: "TcpButtons"
       ios_signing:
         distribution_type: app_store
