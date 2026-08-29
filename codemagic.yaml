@@ -1,6 +1,6 @@
 workflows:
   ios-sideload:
-    name: IPA non signée (sideload)
+    name: Unsigned IPA (sideload)
     max_build_duration: 30
     instance_type: mac_mini_m2
     environment:
@@ -12,11 +12,11 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Installer XcodeGen
+      - name: Install XcodeGen
         script: brew install xcodegen
-      - name: Générer le projet Xcode
+      - name: Generate Xcode project
         script: xcodegen generate
-      - name: Compiler pour appareil, sans signature
+      - name: Build for device, unsigned
         script: |
           xcodebuild \
             -project TcpButtons.xcodeproj \
@@ -30,32 +30,34 @@ workflows:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
             build
-      - name: Empaqueter l'IPA
+      - name: Package the IPA
         script: |
           APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
           if [ -z "$APP_PATH" ]; then
-            echo "Aucun .app produit — la compilation a échoué."
+            echo "No .app produced — build failed."
             exit 1
           fi
-          echo "Application : $APP_PATH"
+          echo "App: $APP_PATH"
           rm -rf Payload TcpButtons.ipa
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qry TcpButtons.ipa Payload
-          echo "IPA créée :"
+          echo "IPA created:"
           ls -lh TcpButtons.ipa
     artifacts:
       - TcpButtons.ipa
       - /tmp/xcodebuild_logs/*.log
 
   ios-appstore:
-    name: Publier sur l'App Store
+    name: Publish to App Store
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
       app_store_connect: TcpButtons
     environment:
       xcode: latest
+      groups:
+        - code-signing
       vars:
         BUNDLE_ID: "com.0tolambo.tcpbuttons"
         XCODE_SCHEME: "TcpButtons"
@@ -66,15 +68,15 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Installer XcodeGen
+      - name: Install XcodeGen
         script: brew install xcodegen
-      - name: Générer le projet Xcode
+      - name: Generate Xcode project
         script: xcodegen generate
-      - name: Récupérer le numéro de build depuis App Store Connect
+      - name: Get build number from App Store Connect
         script: |
           LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$BUNDLE_ID" || echo 0)
           agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
-      - name: Initialiser les certificats et profils de signature
+      - name: Set up code signing certificates and profiles
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
@@ -82,7 +84,7 @@ workflows:
             --create
           keychain add-certificates
           xcode-project use-profiles
-      - name: Compiler l'app et générer l'IPA signée
+      - name: Build and archive the signed IPA
         script: |
           xcode-project build-ipa \
             --project TcpButtons.xcodeproj \
