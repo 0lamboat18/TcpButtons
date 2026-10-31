@@ -74,7 +74,7 @@ workflows:
         script: xcodegen generate
       - name: Get build number from App Store Connect
         script: |
-          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$BUNDLE_ID" || echo 0)
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "6806360626" || echo 0)
           agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
       - name: Set up code signing certificates and profiles
         script: |
