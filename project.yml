@@ -12,7 +12,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "1.1"
     # Fourni par Codemagic à chaque build. Vaut 1 en local.
     CURRENT_PROJECT_VERSION: ${BUILD_NUMBER}
 
