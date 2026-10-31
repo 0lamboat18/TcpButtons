@@ -15,6 +15,7 @@ struct SettingsView: View {
                 ForEach($settings.buttons) { $button in
                     buttonSection($button)
                 }
+                latencySection
                 behaviourSection
             }
             .navigationTitle("Settings")
@@ -130,6 +131,16 @@ struct SettingsView: View {
             Toggle("Test mode", isOn: $settings.testMode)
         } footer: {
             Text("In test mode, buttons log the message without opening a connection.")
+        }
+    }
+
+    private var latencySection: some View {
+        Section {
+            Toggle("Fast mode", isOn: $settings.fastMode)
+        } header: {
+            Text("Latency")
+        } footer: {
+            Text("Keeps one TCP connection open and sends as soon as you touch a button. Messages are sent exactly as typed. The server must accept several messages on one connection.")
         }
     }
 
