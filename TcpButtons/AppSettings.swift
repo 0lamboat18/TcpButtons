@@ -44,6 +44,8 @@ final class AppSettings: ObservableObject {
     @Published var buttons: [TCPButtonConfig] { didSet { save() } }
     @Published var showLog: Bool              { didSet { save() } }
     @Published var testMode: Bool             { didSet { save() } }
+    /// Connexion TCP persistante + envoi dès le toucher (sans attendre le relâchement).
+    @Published var fastMode: Bool             { didSet { save() } }
 
     static let defaultButtons: [TCPButtonConfig] = [
         TCPButtonConfig(label: "Button 1", message: "", colorId: "blue"),
@@ -59,6 +61,7 @@ final class AppSettings: ObservableObject {
         static let buttons = "buttons"
         static let showLog = "showLog"
         static let testMode = "testMode"
+        static let fastMode = "fastMode"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -80,6 +83,7 @@ final class AppSettings: ObservableObject {
 
         showLog = defaults.object(forKey: Key.showLog) as? Bool ?? true
         testMode = defaults.object(forKey: Key.testMode) as? Bool ?? false
+        fastMode = defaults.object(forKey: Key.fastMode) as? Bool ?? false
 
         isLoading = false
     }
@@ -90,6 +94,7 @@ final class AppSettings: ObservableObject {
         defaults.set(Int(port), forKey: Key.port)
         defaults.set(showLog, forKey: Key.showLog)
         defaults.set(testMode, forKey: Key.testMode)
+        defaults.set(fastMode, forKey: Key.fastMode)
         if let data = try? JSONEncoder().encode(buttons) {
             defaults.set(data, forKey: Key.buttons)
         }
