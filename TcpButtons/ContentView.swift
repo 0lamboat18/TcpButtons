@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var settings = AppSettings()
     @StateObject private var echo = EchoServer()
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var log: [LogEntry] = []
     @State private var status = "Ready"
@@ -34,9 +35,18 @@ struct ContentView: View {
                         .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 }
 
+                if settings.fastMode {
+                    Label("Fast mode — persistent connection, sends on touch", systemImage: "bolt.fill")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                }
+
                 VStack(spacing: 12) {
                     ForEach(settings.buttons) { button in
-                        SendButton(config: button) { send(button) }
+                        SendButton(config: button, fireOnTouchDown: settings.fastMode) { send(button) }
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -67,15 +77,32 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 4)
             }
-            .sheet(isPresented: $showSettings) {
+            .sheet(isPresented: $showSettings, onDismiss: warmUp) {
                 SettingsView(settings: settings, echo: echo)
             }
             .onAppear {
                 echo.onReceive = { message in
                     append(.success, "Echo received: \(message)")
                 }
+                warmUp()
+            }
+            .onChange(of: scenePhase) { phase in
+                switch phase {
+                case .active:     warmUp()
+                case .background: TCPClient.close()
+                default:          break
+                }
             }
         }
+    }
+
+    /// Ouvre la connexion avant le premier appui : le message n'a plus qu'à partir.
+    private func warmUp() {
+        guard settings.fastMode, !settings.testMode, !settings.host.isEmpty else {
+            if !settings.fastMode { TCPClient.close() }
+            return
+        }
+        TCPClient.warmUp(host: settings.host, port: settings.port)
     }
 
     private var testButton: some View {
@@ -108,18 +135,30 @@ struct ContentView: View {
             return
         }
 
-        append(.sent, "\(button.message) → \(destination)")
+        let payload = button.message   // envoyé tel quel, sans aucune modification
+        let label = button.displayLabel
+        let fast = settings.fastMode
 
-        TCPClient.send(button.message, to: settings.host, port: settings.port) { result in
+        let handler: (Result<TimeInterval, TCPError>) -> Void = { result in
             switch result {
-            case .success:
-                status = "Sent"
-                append(.success, "\(button.displayLabel) sent")
+            case .success(let elapsed):
+                let ms = Int((elapsed * 1000).rounded())
+                status = fast ? "Sent in \(ms) ms" : "Sent"
+                append(.success, fast ? "\(label) sent in \(ms) ms" : "\(label) sent")
             case .failure(let error):
                 status = error.localizedDescription
                 append(.failure, error.localizedDescription)
             }
         }
+
+        // L'envoi part AVANT toute mise à jour de l'interface.
+        if fast {
+            TCPClient.sendFast(payload, to: settings.host, port: settings.port, completion: handler)
+        } else {
+            TCPClient.send(payload, to: settings.host, port: settings.port, completion: handler)
+        }
+
+        append(.sent, "\(button.message) → \(destination)")
     }
 
     private func testConnection() {
@@ -146,30 +185,44 @@ struct ContentView: View {
     }
 }
 
+/// En mode rapide, le message part dès que le doigt touche l'écran (au lieu d'attendre
+/// le relâchement d'un `Button`, ce qui fait gagner typiquement 50 à 150 ms).
 private struct SendButton: View {
     let config: TCPButtonConfig
+    let fireOnTouchDown: Bool
     let action: () -> Void
 
-    var body: some View {
-        Button(action: action) {
-            Text(config.displayLabel)
-                .font(.system(size: 32, weight: .semibold))
-                .minimumScaleFactor(0.5)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .foregroundStyle(.white)
-                .background(config.color, in: RoundedRectangle(cornerRadius: 20))
-        }
-        .buttonStyle(PressEffect())
-    }
-}
+    @State private var pressed = false
 
-private struct PressEffect: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.75 : 1)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    var body: some View {
+        Text(config.displayLabel)
+            .font(.system(size: 32, weight: .semibold))
+            .minimumScaleFactor(0.5)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .foregroundStyle(.white)
+            .background(config.color, in: RoundedRectangle(cornerRadius: 20))
+            .contentShape(RoundedRectangle(cornerRadius: 20))
+            .scaleEffect(pressed ? 0.97 : 1)
+            .opacity(pressed ? 0.75 : 1)
+            .animation(.easeOut(duration: 0.1), value: pressed)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !pressed else { return }
+                        pressed = true
+                        if fireOnTouchDown { action() }
+                    }
+                    .onEnded { value in
+                        pressed = false
+                        let moved = abs(value.translation.width) > 40 || abs(value.translation.height) > 40
+                        if !fireOnTouchDown && !moved { action() }
+                    }
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(config.displayLabel)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { action() }
     }
 }
 
